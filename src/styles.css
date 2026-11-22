@@ -337,6 +337,10 @@ html[data-theme="dark"] .tile:not(.done) .tile-n { color: #8f9ce0; box-shadow: i
 }
 @media (max-width: 520px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .tile:nth-child(odd) { border-left: 0; padding-left: 0; } }
 html.still *, html.still *::before, html.still *::after { animation: none !important; transition: none !important; }
+/* Scatter dots: a hairline in the card colour keeps overlapping customers apart; hover lifts one. */
+.chart svg .sdot { stroke: var(--paper); stroke-width: 1px; transition: r 180ms ease-out, fill-opacity 180ms ease-out; }
+.chart svg.has-lift .sdot { fill-opacity: .35; }
+.chart svg.has-lift .sdot.is-lifted { r: 7px; fill-opacity: 1; stroke: var(--ink); stroke-width: 1.5px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
