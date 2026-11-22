@@ -492,7 +492,7 @@
       var sp = null, ring = null, slab = null;
       if (!spec.hidden && spec.spot) {
         sp = dots[spec.spot.key];
-        ring = sv('circle', { r: 10, fill: 'none', stroke: '#000', 'stroke-width': 4 }, gSpot);
+        ring = sv('circle', { r: 10, fill: 'none', stroke: C.ink, 'stroke-width': 4 }, gSpot); // ink token, so it flips with dark mode
         slab = sv('text', { 'class': 'vlab name' }, gSpot); slab.textContent = spec.spot.label;
       }
       // nearest-dot hover
@@ -741,7 +741,7 @@
             { type: 'col', w: sz.stack ? sz.compW : Math.round((sz.W - 28 - 100) / 2), h: sz.compH, title: 'Average order value by day', sub: 'All days average ' + money(avgAll),
               spec: { hidden: hidden, fmt: moneyShort, fmtLabel: money, items: DAY_ORDER.map(function (i) {
                 var b = f.by[i], v = b.n ? b.s / b.n : 0;
-                return { key: 'a' + i, label: DAYS[i].slice(0, 1), value: v, color: i === f.topAvg ? C.focus : C.context,
+                return { key: 'a' + i, label: DAYS[i].slice(0, 3), value: v, color: i === f.topAvg ? C.focus : C.context,
                   showLabel: i === f.topAvg, tipTitle: DAYS[i], tip: [['Average order', money(v)], ['Orders', nf(b.n)]] };
               }) } }
           ];
@@ -1045,7 +1045,7 @@
     root.appendChild(band);
     var foot = el('footer', 'site-footer'), fw = el('div', 'wrap');
     var fi = el('img'); fi.src = 'src/vizsight-logo-white.svg'; fi.alt = ''; fw.appendChild(fi);
-    fw.appendChild(el('span', null, 'Designed by Chimdi Nwosu. Source: ' + DS_NAME + ', queried live at ' + hh + ':' + mm +
+    fw.appendChild(el('span', null, 'Designed by Chimdi Nwosu. Source: ' + DS_NAME + (window.FF_SNAPSHOT ? ', saved snapshot' : ', queried live at ' + hh + ':' + mm) +
       '. Every number is counted from the order lines; “busiest”, “quietest” and “top” compare the totals shown in each chart.'));
     foot.appendChild(fw); root.appendChild(foot);
     document.body.appendChild(tip);
