@@ -480,7 +480,7 @@
         var d = dots[p.key];
         var huddle = dollarPos(i);
         var target = spec.hidden ? huddle : { x: X(p.x), y: Y(p.y) };
-        if (!d) { d = dots[p.key] = { c: sv('circle', { r: 4, 'class': 'mark' }, gDots), cur: huddle }; }
+        if (!d) { d = dots[p.key] = { c: sv('circle', { r: 4, 'class': 'mark sdot' }, gDots), cur: huddle }; }
         if (opts.fromBase) { d.cur = huddle; }
         d.from = { x: d.cur.x, y: d.cur.y }; d.to = target; d.p = p;
         d.c.setAttribute('fill', spec.hidden ? C.placeholder : p.color);
@@ -492,7 +492,7 @@
       var sp = null, ring = null, slab = null;
       if (!spec.hidden && spec.spot) {
         sp = dots[spec.spot.key];
-        ring = sv('circle', { r: 10, fill: 'none', stroke: C.ink, 'stroke-width': 4 }, gSpot); // ink token, so it flips with dark mode
+        ring = sv('circle', { r: 10, fill: 'none', stroke: document.documentElement.getAttribute('data-theme') === 'dark' ? C.ink : C.focus, 'stroke-width': 4 }, gSpot); // indigo in light mode, light ink in dark mode
         slab = sv('text', { 'class': 'vlab name' }, gSpot); slab.textContent = spec.spot.label;
       }
       // nearest-dot hover
@@ -503,8 +503,18 @@
         var b = svg.getBoundingClientRect(), mx = e.clientX - b.left, my = e.clientY - b.top, best = null, bd = 400;
         plan.forEach(function (d) { var dx = d.to.x - mx, dy = d.to.y - my, dd = dx * dx + dy * dy; if (dd < bd) { bd = dd; best = d; } });
         if (best) { showTip(e, best.p.label, best.p.tip); } else { hideTip(); }
+        lift(best);
       });
-      hit.addEventListener('mouseleave', hideTip);
+      hit.addEventListener('mouseleave', function () { hideTip(); lift(null); });
+      // The customer under the pointer grows and comes to the front while the rest fade back.
+      var lifted = null;
+      function lift(d) {
+        if (d === lifted) { return; }
+        if (lifted) { lifted.c.classList.remove('is-lifted'); }
+        lifted = d;
+        svg.classList.toggle('has-lift', !!d);
+        if (d) { gDots.appendChild(d.c); d.c.classList.add('is-lifted'); }
+      }
       var spotFrom = spotState, spotTo = sp ? { x: sp.to.x, y: sp.to.y } : null;
       function placeSpot(t) {
         if (!ring || !spotTo) { return; }
