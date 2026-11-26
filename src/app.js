@@ -883,7 +883,7 @@
         },
         finding: function () {
           var p = ship.per[ship.sameMode], std = ship.per['Standard Class'];
-          return { label: 'Same Day, same day', value: p.same, fmt: pct, sign: 0,
+          return { label: 'Same Day orders shipped same day', value: p.same, fmt: pct, sign: 0,
             what: ship.modes.every(function (m2) { return m2 === ship.sameMode || ship.per[m2].same === 0; })
               ? ['No other ship mode ever leaves the same day.'] : ['Other modes leave the same day too, but rarely.'],
             why: ship.outlier ? ['One ', T('outlier', 'A value far outside the rest. Every other order shipped within ' + ship.nextMax + ' days.'), ': a ' + ship.slowMode.join(' and ') + ' order to ' + ship.slowCtry.join(' and ') + ' waited ', B(ship.maxDays + ' days'), '.']
@@ -986,7 +986,7 @@
         },
         finding: function () {
           var t = subs.top, mn = subs.minP;
-          return { label: 'Profit Per Unit', value: t.ppu, fmt: money, sign: t.ppu < 0 ? -1 : 1,
+          return { label: 'Profit per unit', value: t.ppu, fmt: money, sign: t.ppu < 0 ? -1 : 1,
             what: ['for every unit of ' + t.sub + ' sold.'],
             why: mn.ppu < 0 ? [mn.sub + ' lose ', SG(money2(Math.abs(mn.ppu)), -1), ' on every unit sold.'] : [] };
         },
@@ -995,7 +995,7 @@
           var key = S.subSort, list = subs.subs.slice().sort(function (a, b) { return b[key] - a[key]; });
           var mainW = Math.round((sz.W - 28 - 96) * 0.58), compW = sz.W - 28 - 96 - mainW;
           if (sz.stack) { mainW = sz.W - 50; compW = sz.W - 50; }
-          function tipOf(g) { return [['Units', nf(g.qty)], ['Profit', money(g.profit)], ['Profit Per Unit', money2(g.ppu)], ['Sales', money(g.sales)]]; }
+          function tipOf(g) { return [['Units', nf(g.qty)], ['Profit', money(g.profit)], ['Profit per unit', money2(g.ppu)], ['Sales', money(g.sales)]]; }
           return [
             { type: 'hbar', w: mainW, title: key === 'qty' ? 'Units sold by sub-category' : 'Profit by sub-category', sub: 'Sorted by ' + (key === 'qty' ? 'units sold' : 'profit'),
               spec: { row: sz.rowH ? Math.min(24, Math.floor((sz.rowH - 92) / list.length)) : 0, nameW: 112, hidden: hidden, fmt: key === 'qty' ? nf : moneyShort, fmtLabel: key === 'qty' ? nf : money, items: list.map(function (g) {
@@ -1003,7 +1003,7 @@
                 return { key: g.sub, label: g.sub, value: v, bold: g.sub === subs.top.sub,
                   color: key === 'qty' ? (g.sub === subs.top.sub ? C.focus : C.context) : (v < 0 ? C.neg : C.pos), tip: tipOf(g) };
               }) } },
-            { type: 'hbar', w: compW, title: 'Profit Per Unit Sold', sub: 'Same rows, same order',
+            { type: 'hbar', w: compW, title: 'Profit per unit sold', sub: 'Same rows, same order',
               spec: { row: sz.rowH ? Math.min(24, Math.floor((sz.rowH - 92) / list.length)) : 0, hidden: hidden, fmt: money, fmtLabel: money2, items: list.map(function (g) {
                 return { key: g.sub, label: g.sub, value: g.ppu, color: g.ppu < 0 ? C.neg : C.pos, tip: tipOf(g) };
               }) } }
@@ -1131,7 +1131,8 @@
     var dots = el('span', 'score-dots');
     CH.forEach(function (c, i) { dots.appendChild(el('i', S.revealed[i] ? (S.guess[i] === c.answer ? 'got' : 'miss') : '')); });
     UI.score.appendChild(dots);
-    UI.score.appendChild(el('span', null, s.got + ' of ' + CH.length + ' right'));
+    var allDone = s.done === CH.length;
+    UI.score.appendChild(el('span', allDone ? 'score-done' : null, (allDone ? 'All seven done: ' : '') + s.got + ' of ' + CH.length + ' right'));
     if (s.done > 0) {
       var again = el('button', 'skip', 'Start over'); again.type = 'button';
       again.addEventListener('click', startOver);
@@ -1201,7 +1202,7 @@
     UI.finding = el('aside', 'finding'); colVis.appendChild(UI.finding);
     var quiz = el('div', 'quiz');
     UI.qrow = el('div', 'qrow'); quiz.appendChild(UI.qrow);
-    UI.verdictCol = el('div'); quiz.appendChild(UI.verdictCol);
+    UI.verdictCol = el('div'); UI.verdictCol.setAttribute('role', 'status'); UI.verdictCol.setAttribute('aria-live', 'polite'); quiz.appendChild(UI.verdictCol);
     colText.appendChild(quiz);
     var ctl = el('div', 'controls');
     UI.ctlLeft = el('div', 'ctl'); ctl.appendChild(UI.ctlLeft);
