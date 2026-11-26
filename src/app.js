@@ -64,10 +64,9 @@
       var s = el('b');
       if (p.sign) {
         s.className = p.sign < 0 ? 'neg' : 'pos';
-        // the arrow is its own span so a light signal colour can sit on the arrow while the number stays ink;
-        // a non-breaking space keeps the arrow from wrapping away from its number
+        // the arrow is its own span so a light signal colour can sit on the arrow while the number stays ink
         s.appendChild(el('span', 'arr', p.sign < 0 ? '▼' : '▲'));
-        s.appendChild(document.createTextNode(' ' + p.b));
+        s.appendChild(document.createTextNode(' ' + p.b)); // non-breaking: the arrow never wraps away from its number
       } else { s.textContent = p.b; }
       node.appendChild(s);
     });
@@ -360,7 +359,7 @@
   }
 
   // ------------------------------------------------------------------ horizontal ranked bars (rows re-sort with motion)
-  var ROW = 24;
+  var ROW_DEFAULT = 24;
   function HBarChart(host) {
     var svg = sv('svg', {}, host);
     var gGrid = sv('g', {}, svg), gRows = sv('g', {}, svg), gHit = sv('g', {}, svg);
@@ -372,6 +371,7 @@
     this.update = function (spec, opts) {
       opts = opts || {};
       var W = spec.w, items = spec.items, n = items.length;
+      var ROW = spec.row || ROW_DEFAULT; // LANDSCAPE: rows shrink to fit the fixed chart height
       var m = { l: spec.nameW || 12, r: 64, t: 8, b: 8 }, H = m.t + n * ROW + m.b;
       svg.setAttribute('width', W); svg.setAttribute('height', H); svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
       var vals = items.map(function (d) { return d.value; });
@@ -681,8 +681,14 @@
 
   // ------------------------------------------------------------------ chapters
   function chartSizes(W, kind) {
-    // charts sit in cards (24px side padding, 1px border), so plot widths are the card width less 50px
-    var gap = 28, pad = 50;
+    // LANDSCAPE: the chart row has a fixed height inside the 1000px canvas, so plot height comes from that
+    // height (less the card's title, subtitle, legend and padding) and the widths split what is left.
+    var gap = 28, pad = 50, Hc = (UI.charts && UI.charts.clientHeight) || 0;
+    if (Hc > 200) {
+      var ph = Math.round(Hc - 118), cw = Math.round((W - gap - pad * 2) * 0.4); // companion chart takes 40% of the plot width
+      var mw = W - gap - cw - pad * 2;
+      return { mainW: mw, compW: W - gap - (mw + pad) - pad, h: ph, compH: ph, rowH: Hc };
+    }
     if (W < 760) { return { stack: true, mainW: W - pad, compW: W - pad, h: Math.round(clamp(W / 1.8, 240, 420)), compH: Math.round(clamp(W / 1.2, 240, 420)) }; }
     var h = Math.round(clamp((W - gap) / 2.95, 280, 430)), compW = Math.round(h * 1.15);
     if (kind === 'wide') { compW = Math.round(h * 1.05); }
@@ -975,13 +981,13 @@
           function tipOf(g) { return [['Units', nf(g.qty)], ['Profit', money(g.profit)], ['Profit Per Unit', money2(g.ppu)], ['Sales', money(g.sales)]]; }
           return [
             { type: 'hbar', w: mainW, title: key === 'qty' ? 'Units sold by sub-category' : 'Profit by sub-category', sub: 'Sorted by ' + (key === 'qty' ? 'units sold' : 'profit'),
-              spec: { nameW: 112, hidden: hidden, fmt: key === 'qty' ? nf : moneyShort, fmtLabel: key === 'qty' ? nf : money, items: list.map(function (g) {
+              spec: { row: sz.rowH ? Math.min(24, Math.floor((sz.rowH - 92) / list.length)) : 0, nameW: 112, hidden: hidden, fmt: key === 'qty' ? nf : moneyShort, fmtLabel: key === 'qty' ? nf : money, items: list.map(function (g) {
                 var v = g[key];
                 return { key: g.sub, label: g.sub, value: v, bold: g.sub === subs.top.sub,
                   color: key === 'qty' ? (g.sub === subs.top.sub ? C.focus : C.context) : (v < 0 ? C.neg : C.pos), tip: tipOf(g) };
               }) } },
             { type: 'hbar', w: compW, title: 'Profit Per Unit Sold', sub: 'Same rows, same order',
-              spec: { hidden: hidden, fmt: money, fmtLabel: money2, items: list.map(function (g) {
+              spec: { row: sz.rowH ? Math.min(24, Math.floor((sz.rowH - 92) / list.length)) : 0, hidden: hidden, fmt: money, fmtLabel: money2, items: list.map(function (g) {
                 return { key: g.sub, label: g.sub, value: g.ppu, color: g.ppu < 0 ? C.neg : C.pos, tip: tipOf(g) };
               }) } }
           ];
@@ -1078,6 +1084,8 @@
       ' buying ', B(nf(tot.products)), ' ', T('products', 'Counted by product ID. A few IDs carry two slightly different names.'), ' in ', B(tot.states), ' states and provinces, ',
       B(dateText(basket.first)), ' to ', T(dateText(basket.last), 'The first and last order dates. Every year has all twelve months, so 2026 is a full year.', true),
       '. Guess each fact, then watch the charts reveal the answer.']));
+    // LANDSCAPE: the year range starts its own line (owner request)
+    (function (p) { var bs = p.querySelectorAll('b'); var yr = bs[bs.length - 2]; if (yr) { p.insertBefore(document.createElement('br'), yr); } })(left.lastChild);
     row.appendChild(left);
     var sc = el('div', 'score'); sc.appendChild(el('span', 'label', 'Your score'));
     UI.score = el('div', 'score-row'); sc.appendChild(UI.score); row.appendChild(sc);
@@ -1150,23 +1158,23 @@
     UI.stage.textContent = '';
     var card = el('section', 'card enter-' + (dir || 'next'));
     UI.card = card;
-    var head = el('div', 'head');
-    var left = el('div');
+    var colText = el('div', 'col-text'), colVis = el('div', 'col-visual');
+    card.appendChild(colText); card.appendChild(colVis);
+    var left = el('div', 'head');
     left.appendChild(eyebrow('Fact ' + (i + 1) + ' of ' + CH.length + ' · ' + c.eyebrow));
     UI.h2 = el('h2'); left.appendChild(UI.h2);
     UI.lede = el('p', 'lede'); left.appendChild(UI.lede);
-    head.appendChild(left);
-    UI.finding = el('aside', 'finding'); head.appendChild(UI.finding);
-    card.appendChild(head);
+    colText.appendChild(left);
+    UI.finding = el('aside', 'finding'); colVis.appendChild(UI.finding);
     var quiz = el('div', 'quiz');
     UI.qrow = el('div', 'qrow'); quiz.appendChild(UI.qrow);
     UI.verdictCol = el('div'); quiz.appendChild(UI.verdictCol);
-    card.appendChild(quiz);
+    colText.appendChild(quiz);
     var ctl = el('div', 'controls');
     UI.ctlLeft = el('div', 'ctl'); ctl.appendChild(UI.ctlLeft);
     UI.hint = el('div', 'hint'); ctl.appendChild(UI.hint);
-    card.appendChild(ctl);
-    UI.charts = el('div', 'charts'); card.appendChild(UI.charts);
+    colText.appendChild(ctl);
+    UI.charts = el('div', 'charts'); colVis.appendChild(UI.charts);
     var foot = el('div', 'footer');
     foot.appendChild(el('span'));
     var nb = el('div', 'navbtns');
@@ -1174,7 +1182,7 @@
     UI.next = el('button', 'btn' + (revealed ? ' primary' : ''), i === CH.length - 1 ? 'Back to fact 1' : 'Next fact'); UI.next.type = 'button';
     UI.next.addEventListener('click', function () { go(i === CH.length - 1 ? 0 : i + 1); });
     nb.appendChild(prev); nb.appendChild(UI.next); foot.appendChild(nb);
-    card.appendChild(foot);
+    colText.appendChild(foot);
     UI.stage.appendChild(card);
 
     renderQuiz();
@@ -1204,7 +1212,7 @@
       }
     } else {
       big.textContent = '?';
-      UI.finding.appendChild(el('p', 'c', 'Pick an answer below. The number, and the charts behind it, appear as soon as you do.'));
+      UI.finding.appendChild(el('p', 'c', 'Pick an answer on the left. The number, and the charts behind it, appear as soon as you do.'));
     }
     UI.hint.textContent = '';
     UI.hint.appendChild(el('span', 'label', revealed ? 'Try this' : 'Guess first'));
