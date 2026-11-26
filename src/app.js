@@ -40,18 +40,34 @@
     return s + '$' + nf(a);
   }
   function pct(x) { return Math.round(x * 100) + '%'; }
+  function pctSigned(x) { var r = Math.round(x * 100); return (r < 0 ? '−' : '') + Math.abs(r) + '%'; } // true minus, like money()
   function times(a, b) { return (a / b).toFixed(1) + '×'; }
   function plural(n, one, many) { return n === 1 ? one : many; }
   function B(t) { return { b: String(t) }; }
+  // A term with a definition or note: dotted underline, the note shows on hover or keyboard focus.
+  function T(text, note, bold) { return { t: String(text), note: note, bold: !!bold }; }
+  function term(p) {
+    var s = el(p.bold ? 'b' : 'span', 'term', p.t); s.tabIndex = 0; s.setAttribute('aria-label', p.t + '. ' + p.note);
+    function at(evt) { showTip(evt, p.t, [], p.note); }
+    s.addEventListener('mousemove', at); s.addEventListener('mouseleave', hideTip);
+    s.addEventListener('focus', function () { var r = s.getBoundingClientRect(); at({ clientX: r.left, clientY: r.bottom }); });
+    s.addEventListener('blur', hideTip);
+    return s;
+  }
+  function dateText(p) { return p.d + ' ' + ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][p.m - 1] + ' ' + p.y; }
   function SG(t, v) { return { b: String(t), sign: v }; }
   function rich(node, parts) {
     node.textContent = '';
     parts.forEach(function (p) {
       if (typeof p === 'string') { node.appendChild(document.createTextNode(p)); return; }
+      if (p.note) { node.appendChild(term(p)); return; }
       var s = el('b');
       if (p.sign) {
         s.className = p.sign < 0 ? 'neg' : 'pos';
-        s.textContent = (p.sign < 0 ? '▼' : '▲') + ' ' + p.b;
+        // the arrow is its own span so a light signal colour can sit on the arrow while the number stays ink;
+        // a non-breaking space keeps the arrow from wrapping away from its number
+        s.appendChild(el('span', 'arr', p.sign < 0 ? '▼' : '▲'));
+        s.appendChild(document.createTextNode(' ' + p.b));
       } else { s.textContent = p.b; }
       node.appendChild(s);
     });
@@ -216,9 +232,10 @@
 
   // ------------------------------------------------------------------ tooltip
   var tip = el('div', 'tip');
-  function showTip(evt, title, rows) {
+  function showTip(evt, title, rows, note) {
     tip.textContent = '';
     tip.appendChild(el('div', 'tt', title));
+    if (note) { tip.appendChild(el('div', 'tn', note)); }
     rows.forEach(function (r) { var d = el('div', 'tr'); d.appendChild(el('span', null, r[0])); d.appendChild(el('span', null, r[1])); tip.appendChild(d); });
     tip.classList.add('on');
     var x = evt.clientX + 14, y = evt.clientY + 14, w = tip.offsetWidth, h = tip.offsetHeight;
@@ -541,6 +558,15 @@
   }
 
   // ------------------------------------------------------------------ facts (all computed from DATA)
+  // group the one-order-wide counts into bins `w` orders wide (w = 3 gives 1-3, 4-6, ...)
+  function binCounts(dist, w) {
+    var out = [];
+    for (var i = 0; i < dist.length; i += w) {
+      var n = 0; for (var k = i; k < i + w && k < dist.length; k++) { n += dist[k]; }
+      out.push({ lo: i + 1, hi: i + w, n: n });
+    }
+    return out;
+  }
   function ordersFor(year) {
     return year === 'All' ? DATA.orders : DATA.orders.filter(function (o) { return o.date.y === +year; });
   }
@@ -560,7 +586,8 @@
     var share = (dist[mode] || 0) / N;
     var ys = years(), byYear = ys.map(function (y) { return { y: y, n: o.filter(function (x) { return x.date.y === y; }).length }; });
     var ctrys = {}; o.forEach(function (x) { ctrys[x.ctry] = 1; });
-    return { N: N, L: L, dist: dist, keys: keys, maxL: maxL, mode: mode, share: share, byYear: byYear,
+    var byDay = o.slice().sort(function (a, b) { return dayNum(a.date) - dayNum(b.date); });
+    return { N: N, L: L, dist: dist, keys: keys, maxL: maxL, mode: mode, share: share, byYear: byYear, first: byDay[0].date, last: byDay[N - 1].date,
       avgLines: L / N, avgValue: sum(o, function (x) { return x.sales; }) / N, nCtry: Object.keys(ctrys).length, ys: ys };
   }
   function factDays(year) {
@@ -591,17 +618,21 @@
     rows.forEach(function (r) { if (modes.indexOf(r.mode) < 0) { modes.push(r.mode); } });
     var per = {};
     modes.forEach(function (md) {
-      var rs = rows.filter(function (r) { return r.mode === md; }), lines = sum(rs, function (r) { return r.lines; });
+      // Counted in orders: every order ships whole, on one date and by one mode, so the order is the unit that ships.
+      var rs = rows.filter(function (r) { return r.mode === md; }), n = sum(rs, function (r) { return r.orders; });
       var dist = []; for (var d = 0; d <= maxDays; d++) { dist.push(0); }
-      rs.forEach(function (r) { if (r.days >= 0) { dist[r.days] += r.lines; } });
-      per[md] = { lines: lines, dist: dist, avg: lines ? sum(rs, function (r) { return r.days * r.lines; }) / lines : 0,
-        same: lines ? dist[0] / lines : 0, late: lines - dist[0] };
+      rs.forEach(function (r) { if (r.days >= 0) { dist[r.days] += r.orders; } });
+      per[md] = { orders: n, dist: dist, avg: n ? sum(rs, function (r) { return r.days * r.orders; }) / n : 0,
+        same: n ? dist[0] / n : 0, late: n - dist[0] };
     });
     var slowRows = rows.filter(function (r) { return r.days === maxDays; });
     var slowCtry = {}; slowRows.forEach(function (r) { slowCtry[r.ctry] = 1; });
     var slowOrders = sum(slowRows, function (r) { return r.orders; });
     var slowMode = {}; slowRows.forEach(function (r) { slowMode[r.mode] = 1; });
+    // the longest wait is an outlier when it sits at least 3 days past every other order
+    var nextMax = 0; rows.forEach(function (r) { if (r.days < maxDays && r.orders > 0) { nextMax = Math.max(nextMax, r.days); } });
     return { per: per, modes: modes, maxDays: maxDays, slowCtry: Object.keys(slowCtry), slowOrders: slowOrders, slowMode: Object.keys(slowMode),
+      nextMax: nextMax, outlier: maxDays - nextMax >= 3 && slowOrders <= 3,
       sameMode: per['Same Day'] ? 'Same Day' : modes[0] };
   }
   function factDiscount() {
@@ -619,6 +650,8 @@
     return { levels: levels, t: t, prev: below.length ? below[below.length - 1].d : 0,
       lost: sum(above, function (g) { return g.profit; }), n: sum(above, function (g) { return g.n; }),
       keptProfit: sum(below, function (g) { return g.profit; }),
+      discKept: sum(below.filter(function (g) { return g.d > 0; }), function (g) { return g.profit; }),
+      firstDisc: (below.filter(function (g) { return g.d > 0; })[0] || { d: 0 }).d,
       lossShare: sum(above, function (g) { return g.n; }) ? sum(above, function (g) { return g.loss; }) / sum(above, function (g) { return g.n; }) : 0,
       worst: worst };
   }
@@ -670,10 +703,10 @@
           return c.sort(function (a, b) { return a - b; }).map(function (v) { return { key: v, label: v + ' ' + plural(v, 'line', 'lines') }; });
         })(),
         answer: basket.mode,
-        tileValue: function () { return { text: pct(basket.share) }; },
+        tileValue: function () { return { text: basket.mode + ' ' + plural(basket.mode, 'line', 'lines') }; },
         headline: function () {
           return basket.mode === 1
-            ? [B(pct(basket.share)), ' of the store’s ', B(nf(basket.N)), ' orders hold just one product line.']
+            ? [B(pct(basket.share)), ' of the store’s ', B(nf(basket.N)), ' orders hold just one ', T('product line', 'One product in an order, in any quantity. Three mugs of the same kind are one line.'), '.']
             : ['The most common order holds ', B(basket.mode), ' product lines: ', B(pct(basket.share)), ' of ', B(nf(basket.N)), ' orders.'];
         },
         teaser: function () { return ['Some shoppers fill a cart; most do not. Guess the typical basket, then watch the columns settle.']; },
@@ -816,7 +849,7 @@
         headline: function () {
           var p = ship.per[ship.sameMode];
           var out = ['“' + ship.sameMode + '” leaves the same day ', B(pct(p.same)), ' of the time'];
-          return p.late > 0 ? out.concat(['; ', B(nf(p.late)), ' ' + plural(p.late, 'line', 'lines') + ' shipped later.']) : out.concat(['.']);
+          return p.late > 0 ? out.concat(['; ', B(nf(p.late)), ' ' + plural(p.late, 'order', 'orders') + ' shipped later.']) : out.concat(['.']);
         },
         teaser: function () { return ['Four ship modes promise four speeds. Guess how well the fastest one keeps its word.']; },
         lede: function () {
@@ -830,7 +863,8 @@
           return { label: 'Same Day, same day', value: p.same, fmt: pct, sign: 0,
             what: ship.modes.every(function (m2) { return m2 === ship.sameMode || ship.per[m2].same === 0; })
               ? ['No other ship mode ever leaves the same day.'] : ['Other modes leave the same day too, but rarely.'],
-            why: ['The longest wait was ', B(ship.maxDays + ' days'), ', for ', ship.slowOrders === 1 ? 'one order' : ship.slowOrders + ' orders',
+            why: ship.outlier ? ['One ', T('outlier', 'A value far outside the rest. Every other order shipped within ' + ship.nextMax + ' days.'), ': a ' + ship.slowMode.join(' and ') + ' order to ' + ship.slowCtry.join(' and ') + ' waited ', B(ship.maxDays + ' days'), '.']
+              : ['The longest wait was ', B(ship.maxDays + ' days'), ', for ', ship.slowOrders === 1 ? 'one order' : ship.slowOrders + ' orders',
               ' shipped to ' + ship.slowCtry.join(' and ') + '.'] };
         },
         hint: function () { return [B('Try this: '), 'switch ship modes and watch the waiting time spread out.']; },
@@ -839,15 +873,15 @@
           for (var d = 0; d <= ship.maxDays; d++) { keys.push(d); }
           var top = argmax(keys, function (k) { return p.dist[k]; });
           return [
-            { type: 'col', w: sz.mainW, h: sz.h, title: 'Order lines by days to ship', sub: md + ', all years',
+            { type: 'col', w: sz.mainW, h: sz.h, title: 'Orders by days to ship', sub: md + ', all years',
               spec: { lollipop: true, hidden: hidden, fmt: nf, fmtLabel: nf, items: keys.map(function (k) {
                 return { key: 'k' + k, label: String(k), value: p.dist[k], color: k === top ? C.focus : C.context, showLabel: k === top || (k === ship.maxDays && p.dist[k] > 0),
-                  tipTitle: k + ' ' + plural(k, 'day', 'days') + ' to ship', tip: [['Lines', nf(p.dist[k])], ['Share of ' + md, (p.lines ? p.dist[k] / p.lines * 100 : 0).toFixed(1) + '%']] };
+                  tipTitle: k + ' ' + plural(k, 'day', 'days') + ' to ship' + (ship.outlier && k === ship.maxDays ? ' (outlier)' : ''), tip: [['Orders', nf(p.dist[k])], ['Share of ' + md, (p.orders ? p.dist[k] / p.orders * 100 : 0).toFixed(1) + '%']] };
               }) } },
             { type: 'col', w: sz.compW, h: sz.compH, title: 'Average days to ship', sub: 'By ship mode',
               spec: { hidden: hidden, fmt: function (v) { return v.toFixed(0); }, fmtLabel: function (v) { return v.toFixed(1); }, items: ship.modes.map(function (m2) {
                 return { key: 'm' + m2, label: m2.split(' ')[0], value: ship.per[m2].avg, color: m2 === md ? C.focus : C.context, showLabel: true,
-                  tipTitle: m2, tip: [['Average days', ship.per[m2].avg.toFixed(2)], ['Lines', nf(ship.per[m2].lines)]] };
+                  tipTitle: m2, tip: [['Average days', ship.per[m2].avg.toFixed(2)], ['Orders', nf(ship.per[m2].orders)]] };
               }) } }
           ];
         }
@@ -869,26 +903,29 @@
         teaser: function () { return ['Discounts win sales, but at some point they cost more than they earn. Guess where the line is.']; },
         lede: function () {
           return ['Up to ', B(disc.prev + '%'), ' off, discounts still earn a profit overall. From ', B(disc.t + '%'), ' up, ', B(pct(disc.lossShare)),
-            ' of discounted lines lose money.'];
+            ' of discounted ', T('lines', 'Discounts are set per line, and they cluster: the Central region and a few sub-categories (binders, tables, machines) get the deepest cuts.'), ' lose money.'];
         },
         finding: function () {
           var w = disc.worst;
           return { label: 'Lost at ' + disc.t + '%+ off', value: disc.lost, fmt: money, sign: -1,
-            what: ['That cancels ', B(pct(-disc.lost / Math.max(1, disc.keptProfit))), ' of the profit earned at smaller discounts.'],
+            // Compared with profit from lines that were actually discounted, not full-price lines.
+            what: -disc.lost > disc.discKept
+              ? ['More than the ', B(money(disc.discKept)), ' earned on every ' + disc.firstDisc + '–' + disc.prev + '% discount.']
+              : ['That cancels ', B(pct(-disc.lost / Math.max(1, disc.discKept))), ' of the profit earned on ' + disc.firstDisc + '–' + disc.prev + '% discounts.'],
             why: ['Worst single line: a ' + w.pn + ' sold at ' + w.disc + '% off for ', B(money(w.sales)), ' lost ', SG(moneyAbs(w.profit), -1), '.'] };
         },
-        hint: function () { return [B('Try this: '), 'switch to profit per line to see how deep each discount cuts.']; },
+        hint: function () { return [B('Try this: '), 'switch to ', T('profit margin', 'Profit as a share of sales. −50% means the store lost 50 cents on every dollar sold.'), ' to see how deep each discount cuts.']; },
         charts: function (sz, hidden) {
-          var per = S.discMeasure === 'avg';
-          var vals = disc.levels.map(function (g) { return per ? g.profit / g.n : g.profit; });
+          var per = S.discMeasure === 'margin';
+          var vals = disc.levels.map(function (g) { return per ? (g.sales ? g.profit / g.sales : 0) : g.profit; });
           var mx = Math.max.apply(null, vals), mn = Math.min.apply(null, vals);
           return [
-            { type: 'col', w: sz.mainW, h: sz.h, title: per ? 'Average profit per line, by discount' : 'Total profit by discount level',
+            { type: 'col', w: sz.mainW, h: sz.h, title: per ? 'Profit margin by discount level' : 'Total profit by discount level',
               sub: 'Discount off list price', legend: true,
-              spec: { lollipop: true, hidden: hidden, fmt: per ? money : moneyShort, fmtLabel: per ? money : moneyShort, items: disc.levels.map(function (g, i) {
+              spec: { lollipop: true, hidden: hidden, fmt: per ? pctSigned : moneyShort, fmtLabel: per ? pctSigned : moneyShort, items: disc.levels.map(function (g, i) {
                 var v = vals[i];
                 return { key: 'g' + g.d, label: g.d + '%', value: v, color: v < 0 ? C.neg : C.pos, showLabel: v === mx || v === mn,
-                  tipTitle: g.d + '% off', tip: [['Profit', money(g.profit)], ['Per line', money(g.profit / g.n)], ['Lines', nf(g.n)], ['Sales', money(g.sales)]] };
+                  tipTitle: g.d + '% off', tip: [['Profit', money(g.profit)], ['Margin', (g.sales ? g.profit / g.sales * 100 : 0).toFixed(1) + '%'], ['Lines', nf(g.n)], ['Sales', money(g.sales)]] };
               }) } },
             { type: 'col', w: sz.compW, h: sz.compH, title: 'Share of lines that lose money', sub: 'By discount level',
               spec: { hidden: hidden, fmt: pct, fmtLabel: pct, items: disc.levels.map(function (g) {
@@ -900,7 +937,7 @@
         }
       },
       { // 6. copiers
-        tile: 'Profit Per Unit', eyebrow: 'Products',
+        tile: 'Top Profit', eyebrow: 'Products',
         question: 'Which sub-category earns Superstore the most profit?',
         choices: (function () {
           var c = subs.subs.slice().sort(function (a, b) { return b.qty - a.qty; }).filter(function (g) { return g.sub !== subs.top.sub; }).slice(0, 3);
@@ -909,7 +946,7 @@
         })(),
         answer: subs.top.sub,
         controls: 'sub',
-        tileValue: function () { return { text: money(subs.top.ppu), sign: subs.top.ppu < 0 ? -1 : 1 }; },
+        tileValue: function () { return { text: subs.top.sub }; },
         headline: function () {
           var t = subs.top;
           if (t.sub === subs.fewest.sub) {
@@ -971,7 +1008,7 @@
         finding: function () {
           var c = cust.spend;
           return { label: 'Top Spender’s Profit', value: c.profit, fmt: money, sign: c.profit < 0 ? -1 : 1,
-            what: ['A profit margin of ', SG((Math.abs(c.profit / c.sales) * 100).toFixed(1) + '%', c.profit < 0 ? -1 : 1), ' on everything they bought.'],
+            what: ['A ', T('profit margin', 'Profit as a share of sales.'), ' of ', B((c.profit < 0 ? '−' : '') + (Math.abs(c.profit / c.sales) * 100).toFixed(1) + '%'), ' on everything they bought.'],
             why: (function () {
               var top10 = DATA.cust.slice().sort(function (a, b) { return b.sales - a.sales; }).slice(0, 10);
               var k = top10.filter(function (x) { return x.profit < 0; }).length;
@@ -989,10 +1026,11 @@
                 return { key: c.cid, x: c.sales, y: c.profit, color: c.profit < 0 ? C.neg : C.pos, label: c.nm,
                   tip: [['Sales', money(c.sales)], ['Profit', money(c.profit)], ['Orders', nf(c.orders)]] };
               }) : [] } },
-            { type: 'col', w: sz.compW, h: sz.compH, title: 'Customers by number of orders', sub: 'Highlighted: ' + sp.nm + '’s ' + sp.orders,
-              spec: { hidden: hidden, fmt: nf, fmtLabel: nf, items: dist.map(function (v, i) {
-                return { key: 'o' + (i + 1), label: (i + 1) % 2 === 1 ? String(i + 1) : '', value: v, color: i + 1 === sp.orders ? C.focus : C.context,
-                  showLabel: i + 1 === sp.orders, tipTitle: (i + 1) + ' ' + plural(i + 1, 'order', 'orders'), tip: [['Customers', nf(v)]] };
+            { type: 'col', w: sz.compW, h: sz.compH, title: 'Customers by number of orders', sub: 'Bins of 3. Highlighted: ' + sp.nm + '’s ' + sp.orders,
+              spec: { hidden: hidden, fmt: nf, fmtLabel: nf, items: binCounts(dist, 3).map(function (b) {
+                var mine = sp.orders >= b.lo && sp.orders <= b.hi;
+                return { key: 'b' + b.lo, label: b.lo + '–' + b.hi, value: b.n, color: mine ? C.focus : C.context,
+                  showLabel: mine, tipTitle: b.lo + ' to ' + b.hi + ' orders', tip: [['Customers', nf(b.n)]] };
               }) } }
           ];
         }
@@ -1035,8 +1073,10 @@
     left.appendChild(eyebrow('A guessing game in seven facts'));
     left.appendChild(el('h1', null, 'Seven fun facts hiding in Superstore'));
     var basket = factBasket(), tot = DATA.totals;
-    left.appendChild(rich(el('p', 'intro'), ['The file holds ', B(nf(basket.L)), ' order lines: ', B(nf(basket.N)), ' orders from ', B(nf(tot.customers)),
-      ' customers buying ', B(nf(tot.products)), ' products in ', B(tot.states), ' states and provinces, ', B(basket.ys[0]), ' to ', B(basket.ys[basket.ys.length - 1]),
+    left.appendChild(rich(el('p', 'intro'), ['The file holds ', B(nf(basket.L)), ' ', T('order lines', 'One product in one order. An order with three different products has three order lines.'), ': ',
+      B(nf(basket.N)), ' orders from ', B(nf(tot.customers)), ' ', T('customers', 'Counted by name. Harry Olson appears under five customer IDs and counts once.'),
+      ' buying ', B(nf(tot.products)), ' ', T('products', 'Counted by product ID. A few IDs carry two slightly different names.'), ' in ', B(tot.states), ' states and provinces, ',
+      B(dateText(basket.first)), ' to ', T(dateText(basket.last), 'The first and last order dates. Every year has all twelve months, so 2026 is a full year.', true),
       '. Guess each fact, then watch the charts reveal the answer.']));
     row.appendChild(left);
     var sc = el('div', 'score'); sc.appendChild(el('span', 'label', 'Your score'));
@@ -1056,7 +1096,7 @@
     var foot = el('footer', 'site-footer'), fw = el('div', 'wrap');
     var fi = el('img'); fi.src = 'src/vizsight-logo-white.svg'; fi.alt = ''; fw.appendChild(fi);
     fw.appendChild(el('span', null, 'Designed by Chimdi Nwosu. Source: ' + DS_NAME + (window.FF_SNAPSHOT ? ', saved snapshot' : ', queried live at ' + hh + ':' + mm) +
-      '. Every number is counted from the order lines; “busiest”, “quietest” and “top” compare the totals shown in each chart.'));
+      '. Counted from the ' + nf(basket.L) + ' order lines; baskets and shipping are counted per order.'));
     foot.appendChild(fw); root.appendChild(foot);
     document.body.appendChild(tip);
   }
@@ -1265,7 +1305,7 @@
       var p = ship.per[S.mode];
       if (p) { UI.ctlLeft.appendChild(rich(el('span', 'ctl-note'), [B(p.avg < 0.5 ? 'Under half a day' : p.avg.toFixed(1) + ' days'), ' on average, ', B(pct(p.same)), ' same day.'])); }
     } else if (c.controls === 'disc') {
-      UI.ctlLeft.appendChild(tabs([{ key: 'total', label: 'Total profit' }, { key: 'avg', label: 'Profit per line' }], S.discMeasure, function (k) { S.discMeasure = k; refresh(); }));
+      UI.ctlLeft.appendChild(tabs([{ key: 'total', label: 'Total profit' }, { key: 'margin', label: 'Profit margin' }], S.discMeasure, function (k) { S.discMeasure = k; refresh(); }));
     } else if (c.controls === 'sub') {
       UI.ctlLeft.appendChild(tabs([{ key: 'qty', label: 'Sort by units sold' }, { key: 'profit', label: 'Sort by profit' }], S.subSort, function (k) { S.subSort = k; refresh(); }));
     } else if (c.controls === 'spot') {
