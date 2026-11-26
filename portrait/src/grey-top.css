@@ -1,0 +1,10 @@
+/* Variant for comparison only: the hero band in light grey instead of navy (light mode). Dark mode keeps its own hero. */
+html:not([data-theme="dark"]) .hero {
+  --hero-fg: var(--ink); --on-ink: var(--ink); --on-ink-muted: var(--muted); --on-ink-rule: var(--line); --on-ink-line: var(--line-strong);
+  background: #e9edf0; border-bottom: 1px solid var(--line);
+}
+html:not([data-theme="dark"]) .brand-mark { filter: brightness(0); opacity: .85; }
+html:not([data-theme="dark"]) .score-dots i.got, html:not([data-theme="dark"]) .score-dots i.miss { background: var(--ink); }
+html:not([data-theme="dark"]) .score .skip:hover { color: var(--ink); }
+html:not([data-theme="dark"]) .theme-toggle { color: var(--ink); }
+html:not([data-theme="dark"]) .top { padding-bottom: 39px; } /* 1px less for the bottom line, so the canvas stays 1000px */

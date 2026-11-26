@@ -1,0 +1,80 @@
+/* Landscape layout: a fixed 1600 x 1000 canvas with no scrolling, spaced like the portrait version.
+   Loaded after styles.css. It only changes layout and sizes; colours, type and components come from styles.css. */
+
+#app { height: 100vh; min-height: 0; overflow: hidden; }
+.wrap { max-width: none; padding-left: 48px; padding-right: 48px; }
+
+/* Hero: brand bar, then headline and intro beside the score (portrait spacing) */
+.brand { padding-top: 24px; padding-bottom: 2px; }
+.top { padding-top: 6px; padding-bottom: 40px; }
+.top-row { flex-direction: row; align-items: flex-end; gap: 48px; }
+.top h1 { font-size: 38px; margin: 2px 0 4px; text-wrap: nowrap; }
+.intro { font-size: 17px; max-width: 62rem; }
+.score { justify-items: end; }
+
+/* Fact tiles: always one row of seven (the canvas never narrows) */
+.tiles-band { padding-top: 28px; } /* with the tile's own 12px, the white section opens 40px above the tile text */
+.tiles { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.tile:nth-child(n) { border-left: 1px solid var(--line); padding: 12px 16px 10px; }
+.tile:first-child { border-left: 0; padding-left: 0; }
+.tile-big { font-size: clamp(1.25rem, 14cqw, 2.1rem); }
+
+/* Stage: text column beside a visual column, filling the space between the tiles and the footer */
+.body { flex: 1 1 auto; min-height: 0; padding-top: 20px; padding-bottom: 40px; display: flex; }
+.body > .wrap { flex: 1 1 auto; min-height: 0; width: 100%; }
+.card { height: 100%; display: grid; grid-template-columns: 440px minmax(0, 1fr); column-gap: 88px; }
+.col-text { display: flex; flex-direction: column; min-height: 0; }
+.col-visual { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+
+.col-text .head { display: block; }
+.card h2 { font-size: 28px; max-width: none; margin: 4px 0 8px; }
+.lede { font-size: 16px; line-height: 1.5; }
+
+.quiz { margin-top: 14px; padding-top: 10px; gap: 10px; }
+.qrow { gap: 8px; }
+.qrow .label { flex-basis: 100%; margin: 0 0 4px; }
+.choice { padding: 7px 12px; min-height: 40px; font-size: 16px; }
+.skip { font-size: 16px; padding: 6px 4px; }
+.kbd-hint { display: none; }
+
+.controls { margin-top: 12px; gap: 12px; }
+.ctl { gap: 14px; min-height: 0; }
+.seg { gap: 8px; }
+.seg button { padding: 6px 12px; min-height: 36px; font-size: 15px; }
+/* Four options that cannot fit one row sit two by two, so no option is left alone on a line. */
+.seg:has(> button:nth-child(4):last-child) { display: inline-grid; grid-template-columns: repeat(2, auto); justify-content: start; }
+.hint { font-size: 15px; line-height: 1.55; }
+
+.footer { margin-top: auto; padding-top: 10px; }
+
+/* Finding: a strip across the top of the visual column (number, what it means, why it matters) */
+.finding { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr); column-gap: 40px; align-items: end;
+  border-left: 0; border-bottom: 1px solid var(--line); padding: 0 0 22px; }
+.finding > .label { grid-column: 1 / -1; }
+.finding .v { font-size: 64px; margin: 2px 0 0; grid-column: 1; }
+.finding .c { font-size: 16px; line-height: 1.55; grid-column: 2; align-self: end; }
+.finding .why { grid-column: 3; margin: 0; padding: 0 0 0 24px; border-top: 0; border-left: 1px solid var(--line); font-size: 15px; line-height: 1.55; align-self: end; }
+
+/* Charts: fill the rest of the visual column */
+.charts { flex: 1 1 auto; flex-direction: row; min-height: 0; margin-top: 28px; gap: 28px; align-items: stretch; }
+.chart { padding: 21px 24px 24px; position: relative; } /* even padding to the ink on all four sides (the title line adds 3px above its letters); the plot fills the rest. Relative, so the plot is placed from the card itself */
+
+/* Footer: one line */
+.site-footer .wrap { padding-top: 8px; padding-bottom: 8px; font-size: 13px; gap: 12px; }
+.site-footer img { width: 24px; height: 24px; }
+
+/* Footer, option 1: a light grey band instead of a second navy one, so the hero carries the brand weight
+   and the footer quietly closes the page. Grey text, hairline above, the logo in ink. */
+.site-footer { background: var(--paper); color: var(--muted); border-top: 1px solid var(--line); }
+.site-footer .wrap { padding-top: 7px; } /* 1px less, so the hairline keeps the canvas at 1000px */
+.site-footer b { color: var(--ink); }
+.site-footer img { filter: brightness(0); opacity: .8; }
+html[data-theme="dark"] .site-footer { background: var(--paper); color: var(--muted); border-top-color: var(--line); }
+html[data-theme="dark"] .site-footer img { filter: none; opacity: .85; }
+
+/* Previous / Next sit on the text column's left edge, like everything else in the column. */
+.col-text .footer { justify-content: flex-start; }
+.col-text .footer > span:empty { display: none; }
+
+/* Chart cards: square grey panes with no border; the pale grey alone marks each card on the white page (owner choice, 25 Nov 2026). */
+.chart { border: 0; border-radius: 0; }

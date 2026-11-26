@@ -29,7 +29,7 @@
   --gridline: #E6E3E8;      /* chart.gridline */
   --placeholder: #E6E3E8;   /* pre-guess grey marks */
   --teal: #117a74;          /* positive / favorable: current green, kept */
-  --negative: #DB6A93;      /* negative: soft pink (VizSight 0.2), 3.2:1: marks and numbers 24px+ only */
+  --negative: #DB6A93;      /* negative: soft pink, a lighter cousin of the redline magenta so annotations stay distinct (3.2:1: marks and numbers 24px+ only) */
   --redline: #3a4754;       /* variant: graphite annotation (system ink-2); burnt sienna #a8541f, orange #d9560b and magenta #c8235a were tried */
 
   /* kit categorical (assign by stable category ID: Alpha..Foxtrot = 01..06; first four are the core set) */
@@ -86,7 +86,7 @@ html[data-theme="dark"] {
   --gridline: #2f3d4b;
   --placeholder: #46566a;
   --teal: #3fb8ae;
-  --negative: #F08DB2;      /* dark-mode soft pink */
+  --negative: #F08DB2;      /* dark-mode soft pink (7.3:1 on surface) */
   --mark-outline: #9aa7b3;
   color-scheme: dark;
 }
@@ -253,7 +253,7 @@ b.neg .arr { color: var(--negative); }
 .choice.right { background: var(--ink); border-color: var(--ink); color: #fff; }
 .choice.right .tick { margin-left: 6px; font-weight: 700; }
 .choice.wrong { border-color: var(--negative); color: var(--ink-2); text-decoration: line-through; text-decoration-color: var(--negative); }
-.choice.faded { opacity: .5; }
+.choice.faded { color: var(--muted); border-color: var(--line); } /* recessive but still readable (muted text passes 4.5:1); was 50% opacity, 1.9:1 */
 .skip { border: 0; background: none; padding: 8px 4px; font-size: 16px; font-weight: 600; color: var(--muted); cursor: pointer;
   text-decoration: underline; text-underline-offset: 3px; white-space: nowrap; }
 .skip:hover { color: var(--data); }
@@ -350,13 +350,6 @@ html.still *, html.still *::before, html.still *::after { animation: none !impor
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
-
-/* Footer (VizSight 0.2): a light paper band with a hairline above, grey text and the ink mark, so the hero is the only dark band. */
-.site-footer { background: var(--paper); color: var(--muted); border-top: 1px solid var(--line); }
-.site-footer b { color: var(--ink); }
-.site-footer img { filter: brightness(0); opacity: .8; }
-html[data-theme="dark"] .site-footer { background: var(--paper); color: var(--muted); border-top-color: var(--line); }
-html[data-theme="dark"] .site-footer img { filter: none; opacity: .85; }
 
 /* Terms with a definition or note: dotted underline; the note opens in the chart tooltip on hover or focus. */
 .term { text-decoration: underline dotted; text-decoration-color: var(--line-strong); text-decoration-thickness: 1.5px; text-underline-offset: 3px; cursor: help; }
