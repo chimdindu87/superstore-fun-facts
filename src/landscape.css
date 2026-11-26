@@ -57,7 +57,7 @@
 
 /* Charts: fill the rest of the visual column */
 .charts { flex: 1 1 auto; flex-direction: row; min-height: 0; margin-top: 28px; gap: 28px; align-items: stretch; }
-.chart { padding: 20px 24px 16px; }
+.chart { padding: 21px 24px 24px; position: relative; } /* even padding to the ink on all four sides (the title line adds 3px above its letters); the plot fills the rest. Relative, so the plot is placed from the card itself */
 
 /* Footer: one line */
 .site-footer .wrap { padding-top: 8px; padding-bottom: 8px; font-size: 13px; gap: 12px; }
@@ -76,5 +76,5 @@ html[data-theme="dark"] .site-footer img { filter: none; opacity: .85; }
 .col-text .footer { justify-content: flex-start; }
 .col-text .footer > span:empty { display: none; }
 
-/* Chart cards: no border; the pale grey alone marks each card on the white page (owner choice, 25 Nov 2026). */
-.chart { border: 0; }
+/* Chart cards: square grey panes with no border; the pale grey alone marks each card on the white page (owner choice, 25 Nov 2026). */
+.chart { border: 0; border-radius: 0; }

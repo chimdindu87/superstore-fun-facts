@@ -28,6 +28,11 @@
     return e;
   }
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  // painted width of a chart label, so margins hug the text and every card keeps even padding
+  function textW(svg, str, cls) {
+    var t = sv('text', cls ? { 'class': cls } : {}, svg); t.textContent = str;
+    var w = t.getComputedTextLength(); t.remove(); return w;
+  }
   function sum(a, f) { var s = 0; a.forEach(function (x) { s += f ? f(x) : x; }); return s; }
   function nf(n) { return Math.round(n).toLocaleString('en-US'); }
   function money(v) { return (v < 0 ? '−' : '') + '$' + nf(Math.abs(v)); }
@@ -266,17 +271,17 @@
     }
     this.update = function (spec, opts) {
       opts = opts || {};
-      var W = spec.w, H = spec.h, m = { l: 8, r: 8, t: 24, b: 28 };
+      var W = spec.w, H = spec.h, m = { l: 0, r: 0, t: 24, b: 24 };
       var items = spec.items, n = items.length;
       // Axis rule: a value axis only earns its place when some marks are unlabelled. If every mark carries its value, the axis would repeat it.
       var allLabelled = items.every(function (d) { return d.showLabel; });
       var showAxis = !spec.hidden && !allLabelled;
-      if (showAxis) { m.l = 52; }
       svg.setAttribute('width', W); svg.setAttribute('height', H); svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
-      var pw = W - m.l - m.r, ph = H - m.t - m.b;
       var vals = items.map(function (d) { return d.value; });
       var lo = Math.min(0, Math.min.apply(null, vals)), hi = Math.max(0, Math.max.apply(null, vals));
       var ticks = spec.hidden ? [0, 1] : niceTicks(lo, hi, 4);
+      if (showAxis) { m.l = Math.ceil(Math.max.apply(null, ticks.map(function (t) { return textW(svg, spec.fmt(t)); }))) + 8; }
+      var pw = W - m.l - m.r, ph = H - m.t - m.b;
       var dLo = ticks[0], dHi = ticks[ticks.length - 1];
       function y(v) { return m.t + ph - (v - dLo) / (dHi - dLo) * ph; }
       var slot = pw / n, colW = Math.min(32, slot * 0.55), y0 = y(0);
@@ -292,7 +297,7 @@
         sv('line', { x1: m.l, x2: W - m.r, y1: Math.round(y0) + 0.5, y2: Math.round(y0) + 0.5, 'class': 'zeroline' }, gGrid);
       }
       items.forEach(function (d, i) {
-        var tx = sv('text', { x: m.l + slot * (i + 0.5), y: H - 8, 'text-anchor': 'middle' }, gGrid); tx.textContent = d.label;
+        var tx = sv('text', { x: m.l + slot * (i + 0.5), y: H - 3, 'text-anchor': 'middle' }, gGrid); tx.textContent = d.label;
       });
       if (spec.hidden) { gGrid.classList.add('fade-in'); }
       // marks: tween from current state to target
@@ -347,8 +352,8 @@
         }
         var lb = labs[i];
         if (lb) {
-          var up = c.y1 <= c.y0, off = mk.lolli ? 6 + 6 : 6;
-          lb.setAttribute('x', c.cx);
+          var up = c.y1 <= c.y0, off = mk.lolli ? 6 + 6 : 6, half = (lb.__w || (lb.__w = lb.getComputedTextLength())) / 2;
+          lb.setAttribute('x', clamp(c.cx, half, W - half)); // an edge label stays inside the plot
           lb.setAttribute('y', up ? c.y1 - off : c.y1 + off + 10);
         }
       }
@@ -371,13 +376,21 @@
     this.update = function (spec, opts) {
       opts = opts || {};
       var W = spec.w, items = spec.items, n = items.length;
-      var ROW = spec.row || ROW_DEFAULT; // LANDSCAPE: rows shrink to fit the fixed chart height
-      var m = { l: spec.nameW || 12, r: 64, t: 8, b: 8 }, H = m.t + n * ROW + m.b;
+      var m = { l: spec.nameW || 0, r: 0, t: 0, b: 0 };
+      // LANDSCAPE: rows fill the card's height (capped at 28px), so the card keeps even padding at the foot
+      var ROW = spec.h ? Math.min(28, (spec.h - m.t - m.b) / n) : (spec.row || ROW_DEFAULT), H = m.t + n * ROW + m.b;
+      if (spec.h) { m.b += spec.h - H; H = spec.h; }
       svg.setAttribute('width', W); svg.setAttribute('height', H); svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
       var vals = items.map(function (d) { return d.value; });
       var lo = Math.min(0, Math.min.apply(null, vals)), hi = Math.max(0, Math.max.apply(null, vals));
       var ticks = spec.hidden ? [0, 1] : niceTicks(lo, hi, 4), dLo = ticks[0], dHi = ticks[ticks.length - 1];
-      if (lo < 0) { m.l += 52; }
+      // margins hug the value labels: bars run from the widest negative label to the widest positive one
+      var labW = function (v) { return textW(svg, spec.hidden ? '?' : spec.fmtLabel(v), 'vlab') + 6; };
+      var negs = spec.hidden ? [] : items.filter(function (d) { return d.value < 0; });
+      var poss = spec.hidden ? items : items.filter(function (d) { return d.value >= 0; });
+      if (negs.length) { m.l += Math.ceil(Math.max.apply(null, negs.map(function (d) { return labW(d.value); }))); }
+      if (poss.length) { m.r = Math.ceil(Math.max.apply(null, poss.map(function (d) { return labW(d.value); }))); }
+      if (!spec.hidden) { dLo = Math.min(0, lo); dHi = Math.max(0, hi); } else { dLo = 0; dHi = 0.59; } // the longest placeholder bar reaches the edge too
       var pw = W - m.l - m.r;
       function x(v) { return m.l + (v - dLo) / (dHi - dLo) * pw; }
       var x0 = x(0), th = Math.min(13, ROW * 0.55);
@@ -440,11 +453,15 @@
     var dots = {}, spotState = null;
     this.update = function (spec, opts) {
       opts = opts || {};
-      var W = spec.w, H = spec.h, m = { l: 60, r: 16, t: 14, b: 40 };
+      var W = spec.w, H = spec.h, m = { l: 60, r: 16, t: 14, b: 40 }, pts = spec.points;
       svg.setAttribute('width', W); svg.setAttribute('height', H); svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
-      var pw = W - m.l - m.r, ph = H - m.t - m.b, pts = spec.points;
       var xt = niceTicks(0, Math.max.apply(null, pts.map(function (p) { return p.x; })), 5);
       var yt = niceTicks(Math.min(0, Math.min.apply(null, pts.map(function (p) { return p.y; }))), Math.max(0, Math.max.apply(null, pts.map(function (p) { return p.y; }))), 5);
+      if (!spec.hidden) { // margins hug the tick labels, so the card keeps even padding
+        m.l = Math.ceil(Math.max.apply(null, yt.map(function (t) { return textW(svg, moneyShort(t)); }))) + 8;
+        m.r = Math.ceil(textW(svg, moneyShort(xt[xt.length - 1])) / 2);
+      }
+      var pw = W - m.l - m.r, ph = H - m.t - m.b;
       function X(v) { return m.l + (v - xt[0]) / (xt[xt.length - 1] - xt[0]) * pw; }
       function Y(v) { return m.t + ph - (v - yt[0]) / (yt[yt.length - 1] - yt[0]) * ph; }
       gGrid.textContent = '';
@@ -683,7 +700,7 @@
   function chartSizes(W, kind) {
     // LANDSCAPE: the chart row has a fixed height inside the 1000px canvas, so plot height comes from that
     // height (less the card's title, subtitle, legend and padding) and the widths split what is left.
-    var gap = 28, pad = 50, Hc = (UI.charts && UI.charts.clientHeight) || 0;
+    var gap = 28, pad = 48, Hc = (UI.charts && UI.charts.clientHeight) || 0;
     if (Hc > 200) {
       var ph = Math.round(Hc - 118), cw = Math.round((W - gap - pad * 2) * 0.4); // companion chart takes 40% of the plot width
       var mw = W - gap - cw - pad * 2;
@@ -781,13 +798,13 @@
         charts: function (sz, hidden) {
           var f = factDays(S.year), avgAll = sum(f.by, function (b) { return b.s; }) / Math.max(1, sum(f.by, function (b) { return b.n; }));
           return [
-            { type: 'col', w: sz.stack ? sz.mainW : Math.round((sz.W - 28 - 100) / 2), h: sz.h, title: 'Orders by day of the week', sub: S.year === 'All' ? 'All years' : String(S.year),
+            { type: 'col', w: sz.stack ? sz.mainW : Math.round((sz.W - 28 - 96) / 2), h: sz.h, title: 'Orders by day of the week', sub: S.year === 'All' ? 'All years' : String(S.year),
               spec: { hidden: hidden, fmt: nf, fmtLabel: nf, items: DAY_ORDER.map(function (i) {
                 var b = f.by[i];
                 return { key: 'd' + i, label: DAYS[i].slice(0, 3), value: b.n, color: i === f.minD ? C.focus : C.context,
                   showLabel: i === f.minD || i === f.maxD, tipTitle: DAYS[i], tip: [['Orders', nf(b.n)], ['Sales', money(b.s)]] };
               }) } },
-            { type: 'col', w: sz.stack ? sz.compW : Math.round((sz.W - 28 - 100) / 2), h: sz.compH, title: 'Average order value by day', sub: 'All days average ' + money(avgAll),
+            { type: 'col', w: sz.stack ? sz.compW : Math.round((sz.W - 28 - 96) / 2), h: sz.compH, title: 'Average order value by day', sub: 'All days average ' + money(avgAll),
               spec: { hidden: hidden, fmt: moneyShort, fmtLabel: money, items: DAY_ORDER.map(function (i) {
                 var b = f.by[i], v = b.n ? b.s / b.n : 0;
                 return { key: 'a' + i, label: DAYS[i].slice(0, 3), value: v, color: i === f.topAvg ? C.focus : C.context,
@@ -976,7 +993,7 @@
         hint: function () { return [B('Try this: '), 'sort by profit and watch ' + subs.fewest.sub + ' race up the list.']; },
         charts: function (sz, hidden) {
           var key = S.subSort, list = subs.subs.slice().sort(function (a, b) { return b[key] - a[key]; });
-          var mainW = Math.round((sz.W - 28 - 100) * 0.58), compW = sz.W - 28 - 100 - mainW;
+          var mainW = Math.round((sz.W - 28 - 96) * 0.58), compW = sz.W - 28 - 96 - mainW;
           if (sz.stack) { mainW = sz.W - 50; compW = sz.W - 50; }
           function tipOf(g) { return [['Units', nf(g.qty)], ['Profit', money(g.profit)], ['Profit Per Unit', money2(g.ppu)], ['Sales', money(g.sales)]]; }
           return [
@@ -1145,6 +1162,22 @@
   }
 
   var charts = [];
+  // LANDSCAPE: the chart row's height settles after the text above it does (a revealed answer is taller than the
+  // question). When it changes, re-fit the plots so every card keeps even padding at its foot.
+  var rowWatch = null, rowH = 0, rowFit = null;
+  function watchChartRow() {
+    if (!window.ResizeObserver) { return; }
+    if (!rowWatch) {
+      rowWatch = new ResizeObserver(function () {
+        var hNow = UI.charts ? UI.charts.clientHeight : 0;
+        if (!hNow || hNow === rowH) { return; }
+        var first = !rowH; rowH = hNow;
+        if (first) { return; }
+        clearTimeout(rowFit); rowFit = setTimeout(function () { if (charts.length) { drawCharts({ duration: 250, stagger: 0 }); } }, 40);
+      });
+    }
+    rowWatch.disconnect(); rowH = 0; rowWatch.observe(UI.charts);
+  }
   function go(i) {
     if (i < 0 || i >= CH.length || i === S.ch && UI.card) { return; }
     var dir = i >= S.ch ? 'next' : 'prev';
@@ -1174,7 +1207,7 @@
     UI.ctlLeft = el('div', 'ctl'); ctl.appendChild(UI.ctlLeft);
     UI.hint = el('div', 'hint'); ctl.appendChild(UI.hint);
     colText.appendChild(ctl);
-    UI.charts = el('div', 'charts'); colVis.appendChild(UI.charts);
+    UI.charts = el('div', 'charts'); colVis.appendChild(UI.charts); watchChartRow();
     var foot = el('div', 'footer');
     foot.appendChild(el('span'));
     var nb = el('div', 'navbtns');
@@ -1356,17 +1389,22 @@
     specs.forEach(function (s, i) {
       var ch = charts[i]; if (!ch) { return; }
       ch.title.textContent = s.title; ch.sub.textContent = s.sub || ' ';
-      ch.box.style.width = (s.w + 50) + 'px';
+      var sv0 = ch.box.querySelector('svg'); sv0.style.marginTop = '0px'; sv0.parentNode.style.paddingTop = '0px';
+    });
+    // LANDSCAPE: every plot starts on one line and runs to the card's bottom padding, so each card has even padding
+    // layout units, not screen pixels: the page may be zoomed to fit the window, and screen rects would mix the two
+    var heads = charts.map(function (ch) { return ch.box.querySelector('svg').parentNode.offsetTop; }); // the plot's wrapper div (an svg has no offsetTop)
+    var plotTop = Math.max.apply(null, heads);
+    specs.forEach(function (s, i) {
+      var ch = charts[i]; if (!ch) { return; }
+      // padding on the plot's wrapper, not a margin on the svg: a margin would collapse into the subtitle's
+      ch.box.querySelector('svg').parentNode.style.paddingTop = (plotTop - heads[i]) + 'px';
+      var boxH = ch.box.clientHeight, padB = parseFloat(getComputedStyle(ch.box).paddingBottom) || 0;
+      if (UI.charts.clientHeight > 200 && boxH > 200) { s.h = Math.floor(boxH - padB - plotTop); }
+      ch.box.style.width = (s.w + 48) + 'px';
       var o = {}; for (var k in opts) { if (opts.hasOwnProperty(k)) { o[k] = opts[k]; } }
       var spec = s.spec; spec.w = s.w; spec.h = s.h;
       ch.inst.update(spec, o);
-    });
-    // a legend row exists on some charts only: pad the others so plots start on one line
-    var tops = charts.map(function (ch) { return ch.box.querySelector('svg').getBoundingClientRect().top; });
-    var maxTop = Math.max.apply(null, tops);
-    charts.forEach(function (ch, i) {
-      var svg = ch.box.querySelector('svg');
-      svg.style.marginTop = (parseFloat(svg.style.marginTop) || 0) + (maxTop - tops[i]) + 'px';
     });
   }
 
