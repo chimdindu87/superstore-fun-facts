@@ -969,7 +969,7 @@
         })(),
         answer: subs.top.sub,
         controls: 'sub',
-        tileValue: function () { return { text: subs.top.sub }; },
+        tileValue: function () { return { text: subs.top.sub, sign: subs.top.profit < 0 ? -1 : 1 }; }, // a profit fact: green like its finding, as Discounts is pink
         headline: function () {
           var t = subs.top;
           if (t.sub === subs.fewest.sub) {
