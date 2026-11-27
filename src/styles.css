@@ -82,10 +82,10 @@ html[data-theme="dark"] {
   --ink: #e3e8ec; /* softened from #eef2f5 so big headings do not glare on the dark surface */
   --ink-2: #c9d2da;
   --muted: #9aa7b3;
-  --ink-heading: #e3e8ec;      /* only headings and big numbers reach the brightest step */
-  --ink-title: #d6dde3;
-  --ink-body: #c9d2da;
-  --ink-label: #9aa7b3;
+  --ink-heading: #e3e8ec;      /* only headings and big numbers reach the brightest step: 13.6:1 on surface */
+  --ink-title: #c9d2da;        /* owner's stronger split, 26 Nov 2026: 9.4:1 on paper */
+  --ink-body: #b2bdc7;         /* 7.5:1 on paper */
+  --ink-label: #8c99a6;        /* 4.9:1 on paper */
   --line: #2f3d4b;
   --line-strong: #6f7d8a;
   --data: #8C99CF;
