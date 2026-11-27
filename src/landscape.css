@@ -65,11 +65,11 @@
 
 /* Footer, option 1: a light grey band instead of a second navy one, so the hero carries the brand weight
    and the footer quietly closes the page. Grey text, hairline above, the logo in ink. */
-.site-footer { background: var(--paper); color: var(--muted); border-top: 1px solid var(--line); }
+.site-footer { background: var(--paper); color: var(--ink-label); border-top: 1px solid var(--line); }
 .site-footer .wrap { padding-top: 7px; } /* 1px less, so the hairline keeps the canvas at 1000px */
-.site-footer b { color: var(--ink); }
+.site-footer b { color: var(--ink-title); }
 .site-footer img { filter: brightness(0); opacity: .8; }
-html[data-theme="dark"] .site-footer { background: var(--paper); color: var(--muted); border-top-color: var(--line); }
+html[data-theme="dark"] .site-footer { background: var(--paper); color: var(--ink-label); border-top-color: var(--line); }
 html[data-theme="dark"] .site-footer img { filter: none; opacity: .85; }
 
 /* Previous / Next sit on the text column's left edge, like everything else in the column. */
